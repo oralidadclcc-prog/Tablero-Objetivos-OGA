@@ -7,6 +7,50 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<!-- Firebase -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDj6ozDC6R-MXYQ-lKbom_jvD8izXyatjE",
+    authDomain: "tablero-contro-objetivos-oga.firebaseapp.com",
+    projectId: "tablero-contro-objetivos-oga",
+    storageBucket: "tablero-contro-objetivos-oga.firebasestorage.app",
+    messagingSenderId: "715456933462",
+    appId: "1:715456933462:web:0fb4c700013f00030b15f7",
+    measurementId: "G-Q60ZRCSZ2L"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const DOC_REF = doc(db, "tablero", "data");
+
+  // Expose save/load to global scope
+  window._firebaseSave = async function(data) {
+    try {
+      await setDoc(DOC_REF, { payload: JSON.stringify(data) });
+    } catch(e) { console.error("Firebase save error:", e); }
+  };
+
+  window._firebaseLoad = async function() {
+    try {
+      const snap = await getDoc(DOC_REF);
+      if (snap.exists()) return JSON.parse(snap.data().payload);
+    } catch(e) { console.error("Firebase load error:", e); }
+    return {};
+  };
+
+  // Real-time listener: update UI when another user saves
+  onSnapshot(DOC_REF, (snap) => {
+    if (snap.exists() && window._onRemoteUpdate) {
+      try {
+        const remote = JSON.parse(snap.data().payload);
+        window._onRemoteUpdate(remote);
+      } catch(e) {}
+    }
+  });
+</script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -150,6 +194,22 @@
   .upload-btn { font-family: var(--font); font-size: 12px; padding: 6px 12px; border: 0.5px dashed var(--border-2); border-radius: var(--radius-md); background: transparent; color: var(--text-secondary); cursor: pointer; width: 100%; margin-top: 8px; transition: background 0.15s; }
   .upload-btn:hover { background: var(--surface-2); }
   @media (max-width: 600px) { .month-extras { grid-template-columns: 1fr; } }
+
+  /* Lock / Auth */
+  .auth-bar { max-width: 920px; margin: 0 auto 1.25rem; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .auth-bar input[type=password] { font-family: var(--font); font-size: 13px; padding: 6px 10px; border: 0.5px solid var(--border-2); border-radius: var(--radius-md); background: var(--surface); color: var(--text-primary); outline: none; width: 180px; transition: border-color 0.15s; }
+  .auth-bar input[type=password]:focus { border-color: #378ADD; }
+  .auth-bar button { font-family: var(--font); font-size: 12px; font-weight: 500; padding: 6px 14px; border: 0.5px solid var(--border-2); border-radius: var(--radius-md); background: var(--surface); color: var(--text-primary); cursor: pointer; transition: background 0.15s; }
+  .auth-bar button:hover { background: var(--surface-2); }
+  .auth-status { font-size: 12px; display: flex; align-items: center; gap: 5px; font-weight: 500; }
+  .readonly-banner { max-width: 920px; margin: 0 auto 1rem; background: var(--amber-bg); border: 0.5px solid var(--amber-mid); border-radius: var(--radius-md); padding: 8px 14px; font-size: 12px; color: var(--amber-text); display: flex; align-items: center; gap: 7px; }
+  /* When locked: disable all inputs, selects, buttons inside board and contenteditable */
+  body.locked .input-row input,
+  body.locked .input-row select,
+  body.locked .input-row button,
+  body.locked [contenteditable] { pointer-events: none; opacity: 0.45; cursor: not-allowed; }
+  body.locked .upload-btn { pointer-events: none; opacity: 0.45; cursor: not-allowed; }
+  body.locked .history-toggle { pointer-events: auto; opacity: 1; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -167,6 +227,23 @@
   <button onclick="changeMonth(-1)"><i class="ti ti-chevron-left" aria-hidden="true"></i> Anterior</button>
   <span class="month-label" id="month-label">—</span>
   <button onclick="changeMonth(1)">Siguiente <i class="ti ti-chevron-right" aria-hidden="true"></i></button>
+  <span id="sync-status" style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:4px;margin-left:4px;"></span>
+</div>
+
+<!-- Auth bar -->
+<div class="auth-bar">
+  <i class="ti ti-lock" style="font-size:16px;color:var(--text-muted);" aria-hidden="true"></i>
+  <input type="password" id="pwd-input" placeholder="Contraseña de edición" autocomplete="off"
+    onkeydown="if(event.key==='Enter') tryUnlock()">
+  <button onclick="tryUnlock()">Ingresar</button>
+  <span id="auth-status" class="auth-status"></span>
+  <button id="lock-btn" onclick="doLock()" style="display:none;margin-left:auto;">
+    <i class="ti ti-lock-open" style="font-size:13px;vertical-align:-1px;" aria-hidden="true"></i> Cerrar sesión
+  </button>
+</div>
+<div id="readonly-banner" class="readonly-banner" style="display:flex;">
+  <i class="ti ti-eye" aria-hidden="true"></i>
+  Estás en <strong>modo lectura</strong>. Ingresá la contraseña para editar el tablero.
 </div>
 
 <div class="board">
@@ -406,21 +483,54 @@
 
 <script>
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-const STORE_KEY = 'tablero_smart_2026';
-
 let currentMonth = new Date().getMonth(); // 0-indexed
 let allData = {};
+let _saveTimer = null;
 
-// Load from localStorage
-function loadData() {
-  try {
-    const raw = localStorage.getItem(STORE_KEY);
-    if (raw) allData = JSON.parse(raw);
-  } catch(e) { allData = {}; }
+// Debounced save to Firebase (waits 600ms after last change)
+function saveData() {
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(async () => {
+    if (window._firebaseSave) {
+      await window._firebaseSave(allData);
+      showSyncStatus('guardado');
+    }
+  }, 600);
 }
 
-function saveData() {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(allData)); } catch(e) {}
+// Load from Firebase on startup
+async function loadData() {
+  showSyncStatus('cargando');
+  if (window._firebaseLoad) {
+    allData = await window._firebaseLoad();
+  }
+  showSyncStatus('listo');
+}
+
+// Real-time remote update handler
+window._onRemoteUpdate = function(remote) {
+  // Only update if data actually changed
+  if (JSON.stringify(remote) !== JSON.stringify(allData)) {
+    allData = remote;
+    renderMonth();
+    loadLabels();
+    showSyncStatus('actualizado');
+  }
+};
+
+// Sync status indicator
+function showSyncStatus(state) {
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  const map = {
+    'cargando':    { icon: 'ti-loader-2', color: 'var(--text-muted)',      text: 'Cargando...' },
+    'guardado':    { icon: 'ti-cloud-check', color: 'var(--success)',      text: 'Guardado en la nube' },
+    'listo':       { icon: 'ti-cloud', color: 'var(--text-muted)',         text: 'Conectado' },
+    'actualizado': { icon: 'ti-refresh', color: 'var(--blue-mid)',         text: 'Actualizado' },
+  };
+  const s = map[state] || map['listo'];
+  el.innerHTML = `<i class="ti ${s.icon}" style="font-size:13px;vertical-align:-1px;"></i> ${s.text}`;
+  el.style.color = s.color;
 }
 
 function monthKey(m) { return 'month_' + m; }
@@ -736,7 +846,7 @@ function describeArc(cx, cy, r, startDeg, endDeg) {
   return `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
 }
 
-// File attachment (stores base64 in localStorage per month)
+// File attachment (stores base64 in Firebase per month)
 function handleFileUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -805,9 +915,83 @@ function closeLightbox() {
   document.getElementById('lightbox-img').src = '';
 }
 
+
+// ── Authentication (client-side password) ───────────────────────────────────
+// Hash the password so it's not stored in plain text
+const PASS_HASH = '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8'; // "password" SHA-256 default
+// To change the password: run SHA-256 of your chosen password and replace PASS_HASH above
+// Tool: https://emn178.github.io/online-tools/sha256.html
+
+let _isEditor = false;
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function tryUnlock() {
+  const input = document.getElementById('pwd-input');
+  const hash = await sha256(input.value);
+  if (hash === PASS_HASH) {
+    _isEditor = true;
+    input.value = '';
+    setEditorMode(true);
+    sessionStorage.setItem('oga_editor', '1');
+  } else {
+    const st = document.getElementById('auth-status');
+    st.innerHTML = '<i class="ti ti-x" style="color:var(--danger);"></i> <span style="color:var(--danger);">Contraseña incorrecta</span>';
+    setTimeout(() => { st.innerHTML = ''; }, 2500);
+    input.value = '';
+  }
+}
+
+function doLock() {
+  _isEditor = false;
+  sessionStorage.removeItem('oga_editor');
+  setEditorMode(false);
+}
+
+function setEditorMode(on) {
+  const banner = document.getElementById('readonly-banner');
+  const lockBtn = document.getElementById('lock-btn');
+  const authStatus = document.getElementById('auth-status');
+  if (on) {
+    document.body.classList.remove('locked');
+    banner.style.display = 'none';
+    lockBtn.style.display = 'flex';
+    authStatus.innerHTML = '<i class="ti ti-lock-open" style="color:var(--success);font-size:14px;"></i> <span style="color:var(--success);">Modo edición activo</span>';
+  } else {
+    document.body.classList.add('locked');
+    banner.style.display = 'flex';
+    lockBtn.style.display = 'none';
+    authStatus.innerHTML = '';
+  }
+}
+
+// Check if session already has editor access
+if (sessionStorage.getItem('oga_editor') === '1') {
+  _isEditor = true;
+  setEditorMode(true);
+} else {
+  document.body.classList.add('locked');
+}
+
+// Wrap all update functions to check auth first
+const _origUpdateLte = updateLte;
+window.updateLte = function(id, t) { if (_isEditor) _origUpdateLte(id, t); };
+const _origUpdatePctLte = updatePctLte;
+window.updatePctLte = function(id, t) { if (_isEditor) _origUpdatePctLte(id, t); };
+const _origUpdateBool = updateBool;
+window.updateBool = function(id) { if (_isEditor) _origUpdateBool(id); };
+const _origUpdateBoolC3 = updateBoolC3;
+window.updateBoolC3 = function() { if (_isEditor) _origUpdateBoolC3(); };
+
 // Init
-loadData();
-renderMonth();
+(async () => {
+  await loadData();
+  renderMonth();
+  loadLabels();
+})();
 
 // Editable title & subtitle — save on blur
 const boardTitle = document.getElementById('board-title');
@@ -830,7 +1014,6 @@ boardSubtitle.addEventListener('blur', () => {
 });
 boardSubtitle.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); boardSubtitle.blur(); } });
 
-loadLabels();
 </script>
 </body>
 </html>
