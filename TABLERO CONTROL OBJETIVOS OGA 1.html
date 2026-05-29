@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tablero de Control — Objetivos SMART 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f5f4f0; --surface: #ffffff; --surface-2: #f0efe9;
+    --border: rgba(0,0,0,0.1); --border-2: rgba(0,0,0,0.18);
+    --text-primary: #1a1a18; --text-secondary: #5a5a56; --text-muted: #9a9a94;
+    --blue-bg: #E6F1FB; --blue-text: #0C447C; --blue-mid: #378ADD;
+    --pink-bg: #FBEAF0; --pink-text: #72243E; --pink-mid: #D4537E;
+    --green-bg: #EAF3DE; --green-text: #27500A; --green-mid: #639922;
+    --amber-bg: #FAEEDA; --amber-text: #633806; --amber-mid: #BA7517;
+    --success: #3B6D11; --danger: #A32D2D; --process: #BA7517;
+    --radius-md: 8px; --radius-lg: 12px;
+    --font: 'DM Sans', system-ui, sans-serif;
+  }
+  body { font-family: var(--font); background: var(--bg); color: var(--text-primary); min-height: 100vh; padding: 2rem 1rem 4rem; }
+
+  .page-header { max-width: 920px; margin: 0 auto 1.5rem; display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  .page-header h1 { font-size: 22px; font-weight: 600; line-height: 1.3; }
+  .page-header .subtitle { font-size: 14px; color: var(--text-secondary); margin-top: 4px; }
+
+  /* Month nav */
+  .month-nav { max-width: 920px; margin: 0 auto 1.75rem; display: flex; align-items: center; gap: 12px; }
+  .month-nav button { font-family: var(--font); font-size: 14px; padding: 6px 14px; border: 0.5px solid var(--border-2); border-radius: var(--radius-md); background: var(--surface); color: var(--text-primary); cursor: pointer; transition: background 0.15s; display: flex; align-items: center; gap: 5px; }
+  .month-nav button:hover { background: var(--surface-2); }
+  .month-nav button:active { transform: scale(0.97); }
+  .month-label { font-size: 18px; font-weight: 600; color: var(--text-primary); flex: 1; text-align: center; }
+  .month-saved { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 4px; }
+
+  .board { max-width: 920px; margin: 0 auto; }
+
+  .summary-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 2rem; }
+  .summary-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1rem 1.25rem; text-align: center; }
+  .summary-num { font-size: 28px; font-weight: 600; color: var(--text-primary); line-height: 1; }
+  .summary-lbl { font-size: 12px; color: var(--text-muted); margin-top: 5px; }
+
+  .section-header { display: flex; align-items: center; gap: 10px; margin: 2rem 0 0.75rem; border-bottom: 0.5px solid var(--border); padding-bottom: 10px; }
+  .section-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .section-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.06em; }
+  .section-badge { font-size: 11px; padding: 2px 9px; border-radius: 99px; font-weight: 500; }
+
+  .objectives-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+
+  .obj-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1.1rem 1.25rem; transition: border-color 0.15s; }
+  .obj-card:hover { border-color: var(--border-2); }
+  .obj-card.annual-card { border-left: 3px solid var(--amber-mid); }
+
+  .obj-title { font-size: 13px; font-weight: 500; color: var(--text-primary); margin-bottom: 10px; line-height: 1.5; display: flex; align-items: flex-start; gap: 6px; }
+  .obj-title i { flex-shrink: 0; margin-top: 1px; font-size: 15px; }
+
+  .annual-banner { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; color: var(--amber-text); background: var(--amber-bg); border-radius: var(--radius-md); padding: 5px 10px; margin-bottom: 10px; }
+
+  .obj-meta { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+  .meta-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .meta-label { font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 3px; white-space: nowrap; }
+  .meta-label i { font-size: 12px; }
+  .meta-value { font-size: 12px; color: var(--text-secondary); text-align: right; }
+  .target-chip { display: inline-flex; align-items: center; font-size: 12px; font-weight: 500; padding: 3px 10px; border-radius: 99px; }
+
+  .progress-section { margin-top: 10px; }
+  .progress-label { display: flex; justify-content: space-between; margin-bottom: 5px; }
+  .progress-text { font-size: 11px; color: var(--text-muted); }
+  .progress-bar-bg { height: 4px; background: var(--surface-2); border-radius: 99px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 99px; transition: width 0.5s ease, background 0.3s; }
+
+  .input-row { display: flex; align-items: center; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .input-row input[type=number], .input-row select { font-family: var(--font); font-size: 13px; padding: 5px 8px; border: 0.5px solid var(--border-2); border-radius: var(--radius-md); background: var(--surface); color: var(--text-primary); outline: none; transition: border-color 0.15s; }
+  .input-row input[type=number] { width: 80px; }
+  .input-row input:focus, .input-row select:focus { border-color: #378ADD; }
+  .input-row button { font-family: var(--font); font-size: 12px; font-weight: 500; padding: 5px 12px; border: 0.5px solid var(--border-2); border-radius: var(--radius-md); background: var(--surface); color: var(--text-primary); cursor: pointer; transition: background 0.15s; }
+  .input-row button:hover { background: var(--surface-2); }
+  .input-row button:active { transform: scale(0.97); }
+
+  .status-tag { font-size: 12px; font-weight: 500; display: inline-flex; align-items: center; gap: 3px; }
+
+  .history-toggle { font-size: 12px; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 4px; margin-top: 10px; user-select: none; }
+  .history-toggle:hover { color: var(--text-secondary); }
+  .history-table { width: 100%; font-size: 11px; border-collapse: collapse; margin-top: 8px; display: none; }
+  .history-table th { text-align: left; color: var(--text-muted); font-weight: 500; padding: 3px 6px; border-bottom: 0.5px solid var(--border); }
+  .history-table td { padding: 4px 6px; border-bottom: 0.5px solid var(--border); color: var(--text-secondary); }
+  .history-table tr:last-child td { border-bottom: none; }
+
+  .divider { border: none; border-top: 0.5px solid var(--border); margin: 2.5rem 0 0; }
+  .footer { max-width: 920px; margin: 1.5rem auto 0; font-size: 12px; color: var(--text-muted); text-align: center; }
+
+  /* Editable fields */
+  [contenteditable] { outline: none; border-radius: 4px; transition: background 0.15s, box-shadow 0.15s; cursor: text; }
+  [contenteditable]:hover { background: rgba(55,138,221,0.07); }
+  [contenteditable]:focus { background: rgba(55,138,221,0.10); box-shadow: 0 0 0 2px rgba(55,138,221,0.25); padding: 0 4px; }
+  .edit-hint { font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 3px; margin-top: 3px; opacity: 0.7; }
+
+  /* Tooltip */
+  .obj-name-wrap { position: relative; display: inline; }
+  .obj-name-wrap .tooltip {
+    visibility: hidden; opacity: 0;
+    position: absolute; left: 0; top: calc(100% + 8px); z-index: 100;
+    width: 280px; background: #1a1a18; color: #f0efe9;
+    font-size: 12px; font-weight: 400; line-height: 1.5;
+    padding: 10px 13px; border-radius: var(--radius-md);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    pointer-events: none;
+    transition: opacity 0.18s, visibility 0.18s;
+    white-space: normal;
+  }
+  .obj-name-wrap .tooltip::before {
+    content: ''; position: absolute; top: -6px; left: 16px;
+    border: 6px solid transparent; border-top: 0; border-bottom-color: #1a1a18;
+  }
+  .obj-name-wrap:hover .tooltip { visibility: visible; opacity: 1; }
+  .obj-name-text { border-bottom: 1px dashed var(--text-muted); cursor: help; }
+
+  @media (max-width: 520px) {
+    .summary-bar { grid-template-columns: 1fr; }
+    .page-header { flex-direction: column; }
+  }
+
+  /* Pie chart */
+  .month-extras { max-width: 920px; margin: 1.5rem auto 0; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .extras-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1.1rem 1.25rem; }
+  .extras-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+  .pie-wrap { display: flex; align-items: center; gap: 16px; justify-content: center; }
+  .pie-legend { display: flex; flex-direction: column; gap: 8px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .pie-empty { font-size: 12px; color: var(--text-muted); text-align: center; padding: 20px 0; }
+  /* File attachment */
+  .file-list { display: flex; flex-direction: column; gap: 12px; margin-top: 6px; }
+  .file-item { display: flex; flex-direction: column; gap: 6px; background: var(--surface-2); border-radius: var(--radius-md); padding: 8px 10px; }
+  .file-item-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; }
+  .file-item-header a { color: var(--blue-text); text-decoration: none; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
+  .file-item-header a:hover { text-decoration: underline; }
+  .file-item-header button { font-size: 11px; padding: 2px 7px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; flex-shrink: 0; }
+  .file-item-header button:hover { color: var(--danger); }
+  .file-preview { width: 100%; max-height: 320px; object-fit: contain; border-radius: var(--radius-md); border: 0.5px solid var(--border); background: white; cursor: pointer; }
+  .file-preview:hover { opacity: 0.92; }
+  .file-doc { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); padding: 4px 0; }
+  /* Lightbox */
+  .lightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.82); z-index: 999; align-items: center; justify-content: center; }
+  .lightbox.open { display: flex; }
+  .lightbox img { max-width: 92vw; max-height: 88vh; border-radius: var(--radius-lg); box-shadow: 0 8px 40px rgba(0,0,0,0.5); }
+  .lightbox-close { position: absolute; top: 18px; right: 22px; font-size: 28px; color: white; cursor: pointer; line-height: 1; }
+  .upload-btn { font-family: var(--font); font-size: 12px; padding: 6px 12px; border: 0.5px dashed var(--border-2); border-radius: var(--radius-md); background: transparent; color: var(--text-secondary); cursor: pointer; width: 100%; margin-top: 8px; transition: background 0.15s; }
+  .upload-btn:hover { background: var(--surface-2); }
+  @media (max-width: 600px) { .month-extras { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div>
+    <h1><i class="ti ti-chart-bar" style="font-size:20px;vertical-align:-3px;margin-right:6px;color:#378ADD;" aria-hidden="true"></i><span id="board-title" contenteditable="true" spellcheck="false" title="Hacé clic para editar el nombre del tablero">Tablero de control — Objetivos SMART</span></h1>
+    <p class="subtitle"><span id="board-subtitle" contenteditable="true" spellcheck="false" title="Hacé clic para editar el subtítulo">Seguimiento mensual de indicadores por área · 2026</span></p>
+    <p class="edit-hint"><i class="ti ti-pencil" aria-hidden="true"></i> Hacé clic en el título o subtítulo para editarlos</p>
+  </div>
+</div>
+
+<!-- Navegación de meses -->
+<div class="month-nav">
+  <button onclick="changeMonth(-1)"><i class="ti ti-chevron-left" aria-hidden="true"></i> Anterior</button>
+  <span class="month-label" id="month-label">—</span>
+  <button onclick="changeMonth(1)">Siguiente <i class="ti ti-chevron-right" aria-hidden="true"></i></button>
+</div>
+
+<div class="board">
+
+  <div class="summary-bar">
+    <div class="summary-card">
+      <div class="summary-num">8</div>
+      <div class="summary-lbl">objetivos totales</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-num" id="on-track" style="color:var(--success);">—</div>
+      <div class="summary-lbl">en meta</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-num" id="at-risk" style="color:var(--danger);">—</div>
+      <div class="summary-lbl">meta no cumplida</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-num" id="in-process" style="color:var(--process);">—</div>
+      <div class="summary-lbl">en proceso</div>
+    </div>
+  </div>
+
+  <!-- SECCIÓN A -->
+  <div class="section-header">
+    <div class="section-dot" style="background:#185FA5;"></div>
+    <span class="section-title">A — Agendamiento</span>
+    <span class="section-badge" style="background:var(--blue-bg);color:var(--blue-text);">2 objetivos</span>
+  </div>
+  <div class="objectives-grid">
+
+    <div class="obj-card" data-id="a1">
+      <div class="obj-title"><i class="ti ti-calendar-minus" style="color:var(--blue-mid);" aria-hidden="true"></i><span class="obj-name-wrap"><span class="obj-name-text">Desvíos de agenda mensuales</span><span class="tooltip">Disminuir a un máximo de 10 errores mensuales de agendamiento, efectuados por los responsables, mediante el medio de control vigente y con el fin de evitar demoras el día de la audiencia.</span></span></div>
+      <div class="obj-meta">
+        <div class="meta-row"><span class="meta-label"><i class="ti ti-target" aria-hidden="true"></i> Meta</span><span class="target-chip" style="background:var(--blue-bg);color:var(--blue-text);">≤ 10 desvíos/mes</span></div>
+        <div class="meta-row"><span class="meta-label"><i class="ti ti-user" aria-hidden="true"></i> Responsable</span><span class="meta-value">Responsable de control semanal</span></div>
+      </div>
+      <div class="progress-section">
+        <div class="progress-label"><span class="progress-text">Valor actual</span><span class="progress-text" id="a1-display">sin dato</span></div>
+        <div class="progress-bar-bg"><div class="progress-fill" id="a1-bar" style="width:0%;background:var(--blue-mid);"></div></div>
+      </div>
+      <div class="input-row">
+        <input type="number" min="0" placeholder="ej: 7" id="a1-input" aria-label="Desvíos registrados este mes">
+        <button onclick="updateLte('a1',10)">Registrar ↗</button>
+        <span id="a1-status" class="status-tag"></span>
+      </div>
+      <div class="history-toggle" onclick="toggleHistory('a1')"><i class="ti ti-history" aria-hidden="true"></i> Ver historial</div>
+      <table class="history-table" id="a1-history"><thead><tr><th>Mes</th><th>Valor</th><th>Estado</th></tr></thead><tbody></tbody></table>
+    </div>
+
+    <!-- A2: anual, sin seguimiento mensual -->
+    <div class="obj-card annual-card" data-id="a2">
+      <div class="annual-banner"><i class="ti ti-calendar-due" aria-hidden="true"></i> Objetivo anual — plazo diciembre 2026</div>
+      <div class="obj-title"><i class="ti ti-settings-automation" style="color:var(--blue-mid);" aria-hidden="true"></i><span class="obj-name-wrap"><span class="obj-name-text" contenteditable="true" spellcheck="false" title="Hacé clic para editar el nombre del objetivo" style="cursor:text;">Nuevo medio de control de agendamiento</span><span class="tooltip">Diseñar e implementar un nuevo medio de control en el sistema de agendamiento, para diciembre del 2026, a los fines de automatizar y agilizar el proceso de control de agendamiento.</span></span></div>
+      <div class="obj-meta">
+        <div class="meta-row"><span class="meta-label"><i class="ti ti-target" aria-hidden="true"></i> Meta</span><span class="target-chip" style="background:var(--blue-bg);color:var(--blue-text);">Automatización implementada</span></div>
+        <div class="meta-row"><span class="meta-label"><i class="ti ti-calendar" aria-hidden="true"></i> Plazo</span><span class="meta-value">Diciembre 2026</span></div>
+        <div class="meta-row"><span class="meta-label"><i class="ti ti-user" aria-hidden="true"></i> Responsable</span><span class="meta-value">Resp. agendamiento y control</span></div>
+      </div>
+      <div class="input-row" style="margin-top:14px;">
+        <select id="a2-select" aria-label="Estado del nuevo medio de control" onchange="updateBool('a2')">
+          <option value="no">Sin registrar (no cumplido)</option>
+          <option value="process">En desarrollo (en proceso)</option>
+          <option value="yes">Implementado (en meta)</option>
+        </select>
+        <span id="a2-status" class="status-tag" style="margin-left:6px;"></span>
+        <span id="a2-status" class="status-tag"></span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- SECCIÓN B -->
+  <div class="section-header">
+    <div class="section-dot" style="background:#963556;"></div>
+    <span class="section-title">B — Mesa de entrada</span>
+    <span class="section-badge" style="background:var(--pink-bg);color:var(--pink-text);">3 objetivos</span>
+  </div>
+  <div class="objectives-grid">
+
+    <div class="obj-card" data-id="b1">
+      <div class="obj-title"><i class="ti ti-clipboard-check" style="color:var(--pink-mid);" aria-hidden="true"></i><span class="obj-name-wrap"><span class="obj-name-text">Errores en pre-carga y carga de asistentes SUA</span><span class="tooltip">Disminuir a 8 por mes los errores u olvidos en la pre-carga y carga de datos de asistentes de SUA, mediante la revisión de mesa de entradas, con el fin de facilitar y agilizar la tarea de la recepción de asistentes a las audiencias.</span></span></div>
+      <div class="obj-meta">
+        <div class="meta-row"><span class="meta-label"><i class="ti ti-target" aria-hidden="true"></i> Meta</span><span class="target-chip" style="background:var(--pink-bg);color:var(--pink-text);">≤ 8 errores/mes</span></div>
+        <div class="meta-row"><span class="meta-label"><i class="ti ti-user" aria-hidden="true"></i> Responsable</span><span class="meta-value">Resp. registro de hallazgos</span></div>
+      </div>
+      <div class="progress-section">
+        <div class="progress-label"><span class="progress-text">Valor actual</span><span class="progress-text" id="b1-display">sin dato</span></div>
+        <div class="progress-bar-bg"><div class="progress-fill" id="b1-bar" style="width:0%;background:var(--pink-mid);"></div></div>
+      </div>
+      <div class="input-row">
+        <input type="number" min="0" placeholder="ej: 5" id="b1-input" aria-label="Errores de carga de asistentes">
+        <button onclick="updateLte('b1',8)">Registrar ↗</button>
+        <span id="b1-status" class="status-tag"></span>
+      </div>
+      <div class="history-toggle" onclick="toggleHistory('b1')"><i class="ti ti-history" aria-hidden="true"></i> Ver historial</div>
+      <table class="history-table" id="b1-history"><thead><tr><th>Mes</th><th>Valor</th><th>Estado</th></tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="obj-card" data-id="b2">
+      <div class="obj-title"><i class="ti ti-file-certificate" style="color:var(--pink-mid);" aria-hidden="true"></i><span class="obj-name-wrap"><span class="obj-name-text">Errores en tipificación y redacción de certificados</span><span class="tooltip">Disminuir a 10 errores como máximo mensuales en tipificación y redacción de certificados para asistentes, a través del registro efectuado por referentes encargados de revisión y firma, con el fin de asegurar la prolijidad y veracidad de la certificación entregada.</span></span></div>
+      <div class="obj-meta">
+        <div class="meta-row"><span class="meta-label"><i class="ti ti-target" aria-hidden="true"></i> Meta</span><span class="target-chip" style="background:var(--pink-bg);color:var(--pink-text);">≤ 10 errores/mes</span></div>
+        <div class="meta-row"><span class="meta-label"><i class="ti ti-user" aria-hidden="true"></i> Responsable</span><span class="meta-value">Referentes</span></div>
+        <div class="meta-row"><span class="meta-label"><i class="ti ti-info-circle" aria-hidden="true"></i> Nota</span><span class="meta-value">Acordada 17/26</span></div>
+      </div>
+      <div class="progress-section">
+        <div class="progress-label"><span class="progress-text">Valor actual</span><span class="progress-text" id="b2-display">sin dato</span></div>
+        <div class="progress-bar-bg"><div class="progress-fill" id="b2-bar" style="width:0%;background:var(--pink-mid);"></div></div>
+      </div>
+      <div class="input-row">
+        <input type="number" min="0" placeholder="ej: 8" id="b2-input" aria-label="Errores en certificados">
+        <button onclick="updateLte('b2',10)">Registrar ↗</button>
+        <span id="b2-status" class="status-tag"></span>
+      </div>
+      <div class="history-toggle" onclick="toggleHistory('b2')"><i class="ti ti-history" aria-hidden="true"></i> Ver historial</div>
+      <table class="history-table" id="b2-history"><thead><tr><th>Mes</th><th>Valor</th><th>Estado</th></tr></thead><tbody></tbody></table>
+    </div>
+
+
+    <div class="obj-card" data-id="b3">
+      <div class="obj-title"><i class="ti ti-video" style="color:var(--pink-mid);" aria-hidden="true"></i><span class="obj-name-wrap"><span class="obj-name-text">Olvidos/demoras en conexión de audiencias Zoom</span><span class="tooltip">Reducir como máximo a 3 olvidos o demoras en la conexión de audiencias o reuniones mensuales de Zoom, con el fin de cumplir con el servicio que se ofrece.</span></span></div>
+      <div class="obj-meta">
+        <div class="meta-row"><span class="meta-label"><i class="ti ti-target" aria-hidden="true"></i> Meta</span><span class="target-chip" style="background:var(--pink-bg);color:var(--pink-text);">≤ 3 avisos/mes</span></div>
+        <div class="meta-row"><span class="meta-label"><i class="ti ti-user" aria-hidden="true"></i> Responsable</span><span class="meta-value">Responsable de seguimientos</span></div>
+      </div>
+      <div class="progress-section">
+        <div class="progress-label"><span class="progress-text">Valor actual</span><span class="progress-text" id="b3-display">sin dato</span></div>
+        <div class="progress-bar-bg"><div class="progress-fill" id="b3-bar" style="width:0%;background:var(--pink-mid);"></div></div>
+      </div>
+      <div class="input-row">
+        <input type="number" min="0" placeholder="ej: 2" id="b3-input" aria-label="Avisos de demoras en Zoom">
+        <button onclick="updateLte('b3',3)">Registrar ↗</button>
+        <span id="b3-status" class="status-tag"></span>
+      </div>
+      <div class="history-toggle" onclick="toggleHistory('b3')"><i class="ti ti-history" aria-hidden="true"></i> Ver historial</div>
+      <table class="history-table" id="b3-history"><thead><tr><th>Mes</th><th>Valor</th><th>Estado</th></tr></thead><tbody></tbody></table>
+    </div>
+
+  </div>
+
+  <!-- SECCIÓN C -->
+  <div class="section-header">
+    <div class="section-dot" style="background:#3B6D11;"></div>
+    <span class="section-title">C — Operación de sala</span>
+    <span class="section-badge" style="background:var(--green-bg);color:var(--green-text);">3 objetivos</span>
+  </div>
+  <div class="objectives-grid">
+
+    <div class="obj-card" data-id="c1">
+      <div class="obj-title"><i class="ti ti-refresh" style="color:var(--green-mid);" aria-hidden="true"></i><span class="obj-name-wrap"><span class="obj-name-text">Devoluciones de actas por correcciones</span><span class="tooltip">Alcanzar un 5% de devoluciones mensuales de actas sobre correcciones, relevadas por medio de los canales de comunicación establecidos, con el fin de lograr la disminución de errores y mejorar la eficiencia en el labrado de actas.</span></span></div>
+      <div class="obj-meta">
+        <div class="meta-row"><span class="meta-label"><i class="ti ti-target" aria-hidden="true"></i> Meta</span><span class="target-chip" style="background:var(--green-bg);color:var(--green-text);">≤ 5% del total/mes</span></div>
+        <div class="meta-row"><span class="meta-label"><i class="ti ti-notes" aria-hidden="true"></i> Ref. total</span><span class="meta-value">~200 actas/mes</span></div>
+        <div class="meta-row"><span class="meta-label"><i class="ti ti-user" aria-hidden="true"></i> Responsable</span><span class="meta-value">Referentes</span></div>
+      </div>
+      <div class="progress-section">
+        <div class="progress-label"><span class="progress-text">% devoluciones</span><span class="progress-text" id="c1-display">sin dato</span></div>
+        <div class="progress-bar-bg"><div class="progress-fill" id="c1-bar" style="width:0%;background:var(--green-mid);"></div></div>
+      </div>
+      <div class="input-row">
+        <input type="number" min="0" placeholder="devueltas" id="c1-dev" style="width:90px;" aria-label="Actas devueltas">
+        <input type="number" min="1" placeholder="total actas" id="c1-tot" style="width:100px;" value="200" aria-label="Total de actas">
+        <button onclick="updatePctLte('c1',5)">Registrar ↗</button>
+        <span id="c1-status" class="status-tag"></span>
+      </div>
+      <div class="history-toggle" onclick="toggleHistory('c1')"><i class="ti ti-history" aria-hidden="true"></i> Ver historial</div>
+      <table class="history-table" id="c1-history"><thead><tr><th>Mes</th><th>Devueltas</th><th>Total</th><th>%</th><th>Estado</th></tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="obj-card" data-id="c2">
+      <div class="obj-title"><i class="ti ti-clock-check" style="color:var(--green-mid);" aria-hidden="true"></i><span class="obj-name-wrap"><span class="obj-name-text">Actas entregadas en tiempo (≤ 1 hora)</span><span class="tooltip">Lograr que como máximo el 5% de las actas de primera y segunda instancia superen el tiempo establecido (1 hora) una vez finalizada la audiencia, a través del registro de datos del control estadístico de la OGA, con el fin de brindar mayor celeridad a las Ofijus y cámara de apelaciones.</span></span></div>
+      <div class="obj-meta">
+        <div class="meta-row"><span class="meta-label"><i class="ti ti-target" aria-hidden="true"></i> Meta</span><span class="target-chip" style="background:var(--green-bg);color:var(--green-text);">≤ 5% del total/mes</span></div>
+        <div class="meta-row"><span class="meta-label"><i class="ti ti-notes" aria-hidden="true"></i> Ref. total</span><span class="meta-value">~200 actas/mes</span></div>
+        <div class="meta-row"><span class="meta-label"><i class="ti ti-user" aria-hidden="true"></i> Responsable</span><span class="meta-value">Resp. seguimiento del indicador</span></div>
+      </div>
+      <div class="progress-section">
+        <div class="progress-label"><span class="progress-text">% fuera de tiempo</span><span class="progress-text" id="c2-display">sin dato</span></div>
+        <div class="progress-bar-bg"><div class="progress-fill" id="c2-bar" style="width:0%;background:var(--green-mid);"></div></div>
+      </div>
+      <div class="input-row">
+        <input type="number" min="0" placeholder="fuera de tiempo" id="c2-dev" style="width:110px;" aria-label="Actas fuera de tiempo">
+        <input type="number" min="1" placeholder="total actas" id="c2-tot" style="width:100px;" value="200" aria-label="Total de actas">
+        <button onclick="updatePctLte('c2',5)">Registrar ↗</button>
+        <span id="c2-status" class="status-tag"></span>
+      </div>
+      <div class="history-toggle" onclick="toggleHistory('c2')"><i class="ti ti-history" aria-hidden="true"></i> Ver historial</div>
+      <table class="history-table" id="c2-history"><thead><tr><th>Mes</th><th>Fuera de tiempo</th><th>Total</th><th>%</th><th>Estado</th></tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="obj-card annual-card" data-id="c3">
+      <div class="annual-banner"><i class="ti ti-calendar-due" aria-hidden="true"></i> Objetivo anual — plazo diciembre 2026</div>
+      <div class="obj-title"><i class="ti ti-school" style="color:var(--green-mid);" aria-hidden="true"></i><span class="obj-name-wrap"><span class="obj-name-text">Capacitaciones en redacción jurídica</span><span class="tooltip">Obtener al menos una capacitación anual sobre redacción jurídica para los operadores de sala, con el fin de brindar conocimientos y mejorar el tecnicismo en el labrado de actas, por medio de la Escuela Judicial o referente jurisdiccional de Ofiju y cámara de apelación.</span></span></div>
+      <div class="obj-meta">
+        <div class="meta-row"><span class="meta-label"><i class="ti ti-target" aria-hidden="true"></i> Meta</span><span class="target-chip" style="background:var(--green-bg);color:var(--green-text);">≥ 1 capacitación/año</span></div>
+        <div class="meta-row"><span class="meta-label"><i class="ti ti-calendar" aria-hidden="true"></i> Plazo</span><span class="meta-value">Diciembre 2026</span></div>
+        <div class="meta-row"><span class="meta-label"><i class="ti ti-building" aria-hidden="true"></i> Institución</span><span class="meta-value">Escuela Judicial / Ofiju</span></div>
+        <div class="meta-row"><span class="meta-label"><i class="ti ti-user" aria-hidden="true"></i> Responsable</span><span class="meta-value">Referentes y administradores</span></div>
+      </div>
+      <div class="input-row" style="margin-top:14px;">
+        <select id="c3-select" aria-label="Estado de capacitaciones" onchange="updateBoolC3()">
+          <option value="no">Sin registrar (no cumplido)</option>
+          <option value="process">En planificación (en proceso)</option>
+          <option value="yes">Realizado (en meta)</option>
+        </select>
+        <span id="c3-status" class="status-tag" style="margin-left:6px;margin-top:6px;display:inline-flex;"></span>
+      </div>
+    </div>
+
+  </div>
+
+  
+  <div class="month-extras">
+    <div class="extras-card">
+      <div class="extras-title"><i class="ti ti-chart-pie" aria-hidden="true"></i> Resumen del mes</div>
+      <div id="pie-container"><p class="pie-empty">Registrá objetivos para ver el gráfico.</p></div>
+    </div>
+    <div class="extras-card">
+      <div class="extras-title"><i class="ti ti-paperclip" aria-hidden="true"></i> Archivos del mes</div>
+      <div class="file-list" id="file-list"></div>
+      <label class="upload-btn" for="file-upload-input"><i class="ti ti-upload" style="font-size:13px;vertical-align:-1px;margin-right:4px;" aria-hidden="true"></i> Adjuntar archivo o infografía</label>
+      <input type="file" id="file-upload-input" style="display:none;" accept="*/*" onchange="handleFileUpload(event)">
+    </div>
+  </div>
+
+  <hr class="divider">
+  <p class="footer">Tablero de Control — Objetivos SMART 2026 &nbsp;·&nbsp; Los datos se guardan automáticamente en este navegador</p>
+
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <span class="lightbox-close" onclick="closeLightbox()">✕</span>
+  <img id="lightbox-img" src="" alt="Vista ampliada">
+</div>
+
+<script>
+const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const STORE_KEY = 'tablero_smart_2026';
+
+let currentMonth = new Date().getMonth(); // 0-indexed
+let allData = {};
+
+// Load from localStorage
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) allData = JSON.parse(raw);
+  } catch(e) { allData = {}; }
+}
+
+function saveData() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(allData)); } catch(e) {}
+}
+
+function monthKey(m) { return 'month_' + m; }
+
+function getMonthData(m) {
+  return allData[monthKey(m)] || {};
+}
+
+function setMonthData(m, id, val) {
+  if (!allData[monthKey(m)]) allData[monthKey(m)] = {};
+  allData[monthKey(m)][id] = val;
+  saveData();
+}
+
+// UI helpers
+function statusHTML(state) {
+  if (state === true || state === 'yes')
+    return '<i class="ti ti-circle-check" style="color:var(--success);font-size:14px;vertical-align:-2px;"></i> <span style="color:var(--success);">En meta</span>';
+  if (state === 'process')
+    return '<i class="ti ti-clock" style="color:var(--process);font-size:14px;vertical-align:-2px;"></i> <span style="color:var(--process);">En proceso</span>';
+  return '<i class="ti ti-alert-circle" style="color:var(--danger);font-size:14px;vertical-align:-2px;"></i> <span style="color:var(--danger);">Meta no cumplida</span>';
+}
+
+function setBar(id, pct, ok) {
+  const bar = document.getElementById(id + '-bar');
+  if (!bar) return;
+  bar.style.width = Math.min(100, Math.max(0, pct)) + '%';
+  bar.style.background = ok ? 'var(--success)' : 'var(--danger)';
+}
+
+function updateSummary() {
+  const md = getMonthData(currentMonth);
+  const ids = ['a1','b1','b2','b3','c1','c2'];
+  const recorded = ids.filter(id => md[id] !== undefined);
+  if (!recorded.length && allData['annual_a2'] === undefined && allData['annual_c3'] === undefined) {
+    document.getElementById('on-track').textContent = '—';
+    document.getElementById('at-risk').textContent = '—';
+    const ip2 = document.getElementById('in-process');
+    if (ip2) ip2.textContent = '—';
+    return;
+  }
+  // a2 is annual
+  const a2ok = allData['annual_a2'] !== undefined ? allData['annual_a2'].ok : null;
+  const allIds = [...ids];
+  if (a2ok !== null) allIds.push('a2_annual');
+
+  const c3ok = allData['annual_c3'] !== undefined ? allData['annual_c3'].ok : null;
+
+  const onT = recorded.filter(id => md[id].ok === true).length
+    + (a2ok === true ? 1 : 0) + (c3ok === true ? 1 : 0);
+  const inP = recorded.filter(id => md[id].ok === 'process').length
+    + (a2ok === 'process' ? 1 : 0) + (c3ok === 'process' ? 1 : 0);
+  const atR = recorded.filter(id => md[id].ok === false).length
+    + (a2ok === false ? 1 : 0) + (c3ok === false ? 1 : 0);
+
+  document.getElementById('on-track').textContent = onT;
+  document.getElementById('at-risk').textContent = atR;
+  const ip = document.getElementById('in-process');
+  if (ip) ip.textContent = inP;
+  renderPieChart();
+}
+
+function renderCard(id, d) {
+  const disp = document.getElementById(id + '-display');
+  const status = document.getElementById(id + '-status');
+  if (!d) {
+    if (disp) disp.textContent = 'sin dato';
+    if (status) status.innerHTML = '';
+    setBar(id, 0, false);
+    const bar = document.getElementById(id + '-bar');
+    if (bar) bar.style.background = 'var(--blue-mid)';
+    return;
+  }
+  if (disp) disp.textContent = d.label;
+  if (status) status.innerHTML = statusHTML(d.ok);
+  setBar(id, d.barPct, d.ok);
+}
+
+function renderMonth() {
+  const md = getMonthData(currentMonth);
+  document.getElementById('month-label').textContent = MONTHS[currentMonth] + ' 2026';
+
+  // Clear inputs
+  ['a1','b1','b2','b3'].forEach(id => {
+    const inp = document.getElementById(id + '-input');
+    if (inp) inp.value = '';
+  });
+  const c1dev = document.getElementById('c1-dev');
+  const c1tot = document.getElementById('c1-tot');
+  if (c1dev) c1dev.value = '';
+  if (c1tot) c1tot.value = '200';
+  const c2dev = document.getElementById('c2-dev');
+  const c2tot2 = document.getElementById('c2-tot');
+  if (c2dev) c2dev.value = '';
+  if (c2tot2) c2tot2.value = '200';
+
+  // Render each monthly metric
+  ['a1','b1','b2','b3','c1','c2'].forEach(id => {
+    renderCard(id, md[id]);
+  });
+
+  // Render a2 annual
+  const annualA2 = allData['annual_a2'];
+  const a2sel = document.getElementById('a2-select');
+  if (annualA2 && a2sel) {
+    a2sel.value = annualA2.val;
+    document.getElementById('a2-status').innerHTML = statusHTML(annualA2.ok);
+  } else if (a2sel) {
+    a2sel.value = 'no';
+    document.getElementById('a2-status').innerHTML = statusHTML(false);
+  }
+
+  // Render c3 annual
+  const annualC3 = allData['annual_c3'];
+  const c3sel = document.getElementById('c3-select');
+  if (annualC3 && c3sel) {
+    c3sel.value = annualC3.val;
+    document.getElementById('c3-status').innerHTML = statusHTML(annualC3.ok);
+  } else if (c3sel) {
+    c3sel.value = 'no';
+    document.getElementById('c3-status').innerHTML = statusHTML(false);
+  }
+
+  updateSummary();
+  renderAllHistories();
+  renderPieChart();
+  renderFileList();
+}
+
+// Month navigation
+function changeMonth(dir) {
+  currentMonth = Math.max(0, Math.min(11, currentMonth + dir));
+  renderMonth();
+}
+
+// Update functions
+function updateLte(id, target) {
+  const val = parseInt(document.getElementById(id + '-input').value);
+  if (isNaN(val) || val < 0) return;
+  const ok = val <= target;
+  const barPct = Math.round((val / (target * 2)) * 100);
+  const label = val + (ok ? ' ✓' : ' ✗');
+  const d = { val, ok, barPct, label, type: 'lte', target };
+  setMonthData(currentMonth, id, d);
+  renderCard(id, d);
+  updateSummary();
+  renderHistory(id);
+}
+
+function updateBool(id) {
+  const val = document.getElementById(id + '-select').value;
+  const ok = val === 'yes' ? true : (val === 'process' ? 'process' : false);
+  allData['annual_a2'] = { val, ok };
+  saveData();
+  document.getElementById('a2-status').innerHTML = statusHTML(ok);
+  updateSummary();
+}
+
+function updateBoolC3() {
+  const val = document.getElementById('c3-select').value;
+  const ok = val === 'yes' ? true : (val === 'process' ? 'process' : false);
+  allData['annual_c3'] = { val, ok };
+  saveData();
+  document.getElementById('c3-status').innerHTML = statusHTML(ok);
+  updateSummary();
+}
+
+function updatePctLte(id, target) {
+  const dev = parseFloat(document.getElementById(id + '-dev').value);
+  const tot = parseFloat(document.getElementById(id + '-tot').value);
+  if (isNaN(dev) || isNaN(tot) || tot === 0) return;
+  const pct = (dev / tot) * 100;
+  const ok = pct <= target;
+  const barPct = Math.round((pct / (target * 2)) * 100);
+  const label = pct.toFixed(1) + '%' + (ok ? ' ✓' : ' ✗');
+  const d = { dev, tot, pct, ok, barPct, label, type: 'pct-lte', target };
+  setMonthData(currentMonth, id, d);
+  renderCard(id, d);
+  updateSummary();
+  renderHistory(id);
+}
+
+function updatePctGte(id, target) {
+  const okN = parseFloat(document.getElementById(id + '-ok').value);
+  const tot = parseFloat(document.getElementById(id + '-tot').value);
+  if (isNaN(okN) || isNaN(tot) || tot === 0) return;
+  const pct = (okN / tot) * 100;
+  const ok = pct >= target;
+  const barPct = Math.round(pct);
+  const label = pct.toFixed(1) + '%' + (ok ? ' ✓' : ' ✗');
+  const d = { okN, tot, pct, ok, barPct, label, type: 'pct-gte', target };
+  setMonthData(currentMonth, id, d);
+  renderCard(id, d);
+  updateSummary();
+  renderHistory(id);
+}
+
+function updateGte(id, target) {
+  const val = parseInt(document.getElementById(id + '-input').value);
+  if (isNaN(val) || val < 0) return;
+  const ok = val >= target;
+  const barPct = Math.min(100, val * 100);
+  const label = val + (ok ? ' ✓' : ' ✗');
+  const d = { val, ok, barPct, label, type: 'gte', target };
+  setMonthData(currentMonth, id, d);
+  renderCard(id, d);
+  updateSummary();
+  renderHistory(id);
+}
+
+// History
+function toggleHistory(id) {
+  const tbl = document.getElementById(id + '-history');
+  if (!tbl) return;
+  tbl.style.display = tbl.style.display === 'table' ? 'none' : 'table';
+}
+
+function renderHistory(id) {
+  const tbl = document.getElementById(id + '-history');
+  if (!tbl) return;
+  const tbody = tbl.querySelector('tbody');
+  tbody.innerHTML = '';
+  for (let m = 0; m < 12; m++) {
+    const md = getMonthData(m);
+    const d = md[id];
+    if (!d) continue;
+    const tr = document.createElement('tr');
+    let cells = '';
+    if (d.type === 'lte' || d.type === 'gte') {
+      cells = `<td>${MONTHS[m]}</td><td>${d.val}</td><td>${d.ok ? '✓ En meta' : '✗ En riesgo'}</td>`;
+    } else if (d.type === 'pct-lte') {
+      cells = `<td>${MONTHS[m]}</td><td>${d.dev}</td><td>${d.tot}</td><td>${d.pct.toFixed(1)}%</td><td>${d.ok ? '✓ En meta' : '✗ En riesgo'}</td>`;
+    } else if (d.type === 'pct-gte') {
+      cells = `<td>${MONTHS[m]}</td><td>${d.okN}</td><td>${d.tot}</td><td>${d.pct.toFixed(1)}%</td><td>${d.ok ? '✓ En meta' : '✗ En riesgo'}</td>`;
+    }
+    tr.innerHTML = cells;
+    tr.style.color = d.ok ? 'var(--success)' : 'var(--danger)';
+    tbody.appendChild(tr);
+  }
+}
+
+function renderAllHistories() {
+  ['a1','b1','b2','b3','c1','c2'].forEach(renderHistory);
+}
+
+
+// Pie chart
+function renderPieChart() {
+  const container = document.getElementById('pie-container');
+  if (!container) return;
+  const md = getMonthData(currentMonth);
+  const ids = ['a1','b1','b2','b3','c1','c2'];
+  const recorded = ids.filter(id => md[id] !== undefined);
+  const a2ok = allData['annual_a2'] !== undefined ? allData['annual_a2'].ok : null;
+  const c3ok = allData['annual_c3'] !== undefined ? allData['annual_c3'].ok : null;
+
+  let onT = recorded.filter(id => md[id].ok === true).length;
+  let inP = recorded.filter(id => md[id].ok === 'process').length;
+  let atR = recorded.filter(id => md[id].ok === false).length;
+  if (a2ok === true) onT++; else if (a2ok === 'process') inP++; else if (a2ok === false) atR++;
+  if (c3ok === true) onT++; else if (c3ok === 'process') inP++; else if (c3ok === false) atR++;
+
+  const total = onT + inP + atR;
+  if (total === 0) {
+    container.innerHTML = '<p class="pie-empty">Registrá objetivos para ver el gráfico.</p>';
+    return;
+  }
+
+  const degOn = (onT / total) * 360;
+  const degProc = (inP / total) * 360;
+  const degAt = (atR / total) * 360;
+  const pctOn = Math.round((onT / total) * 100);
+  const pctProc = Math.round((inP / total) * 100);
+  const pctAt = 100 - pctOn - pctProc;
+
+  let slices = '';
+  if (total === onT) {
+    slices = `<circle cx="45" cy="45" r="38" fill="#3B6D11"/>`;
+  } else if (total === atR) {
+    slices = `<circle cx="45" cy="45" r="38" fill="#A32D2D"/>`;
+  } else if (total === inP) {
+    slices = `<circle cx="45" cy="45" r="38" fill="#BA7517"/>`;
+  } else {
+    let start = 0;
+    if (onT > 0)  { slices += `<path d="${describeArc(45,45,38,start,start+degOn)}" fill="#3B6D11"/>`; start += degOn; }
+    if (inP > 0)  { slices += `<path d="${describeArc(45,45,38,start,start+degProc)}" fill="#BA7517"/>`; start += degProc; }
+    if (atR > 0)  { slices += `<path d="${describeArc(45,45,38,start,start+degAt)}" fill="#A32D2D"/>`; }
+  }
+
+  const svg = `<div class="pie-wrap">
+    <svg width="90" height="90" viewBox="0 0 90 90">
+      ${slices}
+      <circle cx="45" cy="45" r="24" fill="white"/>
+      <text x="45" y="49" text-anchor="middle" font-size="13" font-weight="600" fill="#1a1a18">${total}</text>
+    </svg>
+    <div class="pie-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#3B6D11;"></div> En meta: <strong>${onT}</strong> (${pctOn}%)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#BA7517;"></div> En proceso: <strong>${inP}</strong> (${pctProc}%)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#A32D2D;"></div> Meta no cumplida: <strong>${atR}</strong> (${pctAt}%)</div>
+      <div class="legend-item" style="color:var(--text-muted);font-size:11px;">Total registrados: ${total}/8</div>
+    </div>
+  </div>`;
+  container.innerHTML = svg;
+}
+
+function describeArc(cx, cy, r, startDeg, endDeg) {
+  const toRad = d => (d - 90) * Math.PI / 180;
+  const x1 = cx + r * Math.cos(toRad(startDeg));
+  const y1 = cy + r * Math.sin(toRad(startDeg));
+  const x2 = cx + r * Math.cos(toRad(endDeg));
+  const y2 = cy + r * Math.sin(toRad(endDeg));
+  const large = (endDeg - startDeg) > 180 ? 1 : 0;
+  return `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
+}
+
+// File attachment (stores base64 in localStorage per month)
+function handleFileUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (file.size > 10 * 1024 * 1024) { alert('El archivo supera los 10MB. Usá archivos más pequeños.'); return; }
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const key = monthKey(currentMonth);
+    if (!allData[key]) allData[key] = {};
+    if (!allData[key]._files) allData[key]._files = [];
+    allData[key]._files.push({ name: file.name, type: file.type, data: e.target.result });
+    saveData();
+    renderFileList();
+  };
+  reader.readAsDataURL(file);
+  event.target.value = '';
+}
+
+function isImage(f) {
+  return f.type && f.type.startsWith('image/');
+}
+
+function renderFileList() {
+  const list = document.getElementById('file-list');
+  if (!list) return;
+  const md = getMonthData(currentMonth);
+  const files = md._files || [];
+  if (!files.length) {
+    list.innerHTML = '<p style="font-size:12px;color:var(--text-muted);padding:4px 0;">Sin archivos adjuntos.</p>';
+    return;
+  }
+  list.innerHTML = files.map((f, i) => {
+    const img = isImage(f);
+    return `<div class="file-item">
+      <div class="file-item-header">
+        <i class="ti ti-${img ? 'photo' : 'file'}" style="font-size:14px;color:var(--text-muted);flex-shrink:0;" aria-hidden="true"></i>
+        <a href="${f.data}" download="${f.name}" title="Descargar ${f.name}">${f.name}</a>
+        <button onclick="removeFile(${i})" title="Eliminar">✕</button>
+      </div>
+      ${img
+        ? `<img class="file-preview" src="${f.data}" alt="${f.name}" onclick="openLightbox('${i}')" title="Clic para ampliar">`
+        : `<div class="file-doc"><i class="ti ti-file-description" style="font-size:13px;" aria-hidden="true"></i> Documento adjunto — <a href="${f.data}" download="${f.name}" style="color:var(--blue-text);">Descargar</a></div>`
+      }
+    </div>`;
+  }).join('');
+}
+
+function removeFile(idx) {
+  const key = monthKey(currentMonth);
+  if (!allData[key] || !allData[key]._files) return;
+  allData[key]._files.splice(idx, 1);
+  saveData();
+  renderFileList();
+}
+
+function openLightbox(idx) {
+  const md = getMonthData(currentMonth);
+  const files = md._files || [];
+  const f = files[parseInt(idx)];
+  if (!f) return;
+  document.getElementById('lightbox-img').src = f.data;
+  document.getElementById('lightbox').classList.add('open');
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+  document.getElementById('lightbox-img').src = '';
+}
+
+// Init
+loadData();
+renderMonth();
+
+// Editable title & subtitle — save on blur
+const boardTitle = document.getElementById('board-title');
+const boardSubtitle = document.getElementById('board-subtitle');
+
+function loadLabels() {
+  if (allData['board_title']) boardTitle.textContent = allData['board_title'];
+  if (allData['board_subtitle']) boardSubtitle.textContent = allData['board_subtitle'];
+}
+
+boardTitle.addEventListener('blur', () => {
+  allData['board_title'] = boardTitle.textContent.trim() || 'Tablero de control — Objetivos SMART';
+  saveData();
+});
+boardTitle.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); boardTitle.blur(); } });
+
+boardSubtitle.addEventListener('blur', () => {
+  allData['board_subtitle'] = boardSubtitle.textContent.trim() || 'Seguimiento mensual de indicadores por área · 2026';
+  saveData();
+});
+boardSubtitle.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); boardSubtitle.blur(); } });
+
+loadLabels();
+</script>
+</body>
+</html>
