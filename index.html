@@ -36,7 +36,7 @@
   window._firebaseSaveMonth = async function(monthKey, monthData) {
     try {
       const payload = JSON.stringify(monthData);
-      if (payload.length > 950000) {
+      if (payload.length > 980000) {
         if (window._onSaveTooBig) window._onSaveTooBig();
         return false;
       }
@@ -913,8 +913,8 @@ function describeArc(cx, cy, r, startDeg, endDeg) {
 }
 
 // File attachment — compressed and stored in Firestore (cloud, shared)
-const MAX_FILE_KB = 700; // max KB per file after compression
-const MAX_DIMENSION = 1800; // max width or height in pixels
+const MAX_FILE_KB = 500; // max KB per file after compression
+const MAX_DIMENSION = 1200; // max width or height in pixels
 
 // Compress image using canvas — progressive until it fits
 function compressImage(file) {
@@ -948,11 +948,11 @@ function compressImage(file) {
         let dataUrl = tryCompress(quality, dim);
 
         while (dataUrl.length > MAX_FILE_KB * 1024 * 1.37) {
-          if (quality > 0.25) {
+          if (quality > 0.15) {
             quality = Math.round((quality - 0.1) * 10) / 10;
-          } else if (dim > 600) {
-            dim -= 200;
-            quality = 0.7;
+          } else if (dim > 400) {
+            dim -= 150;
+            quality = 0.6;
           } else {
             // Can't compress further
             break;
