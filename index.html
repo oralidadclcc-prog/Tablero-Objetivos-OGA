@@ -11,6 +11,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyDj6ozDC6R-MXYQ-lKbom_jvD8izXyatjE",
@@ -24,12 +25,22 @@
 
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
+  const storage = getStorage(app);
   const DOC_REF = doc(db, "tablero", "data");
 
   // Expose save/load to global scope
   window._firebaseSave = async function(data) {
     try {
-      await setDoc(DOC_REF, { payload: JSON.stringify(data) });
+      // Strip base64 data before saving to Firestore (files stored in Storage)
+      const clean = JSON.parse(JSON.stringify(data));
+      for (const key of Object.keys(clean)) {
+        if (clean[key]._files) {
+          clean[key]._files = clean[key]._files.map(f => ({
+            name: f.name, type: f.type, url: f.url || null
+          }));
+        }
+      }
+      await setDoc(DOC_REF, { payload: JSON.stringify(clean) });
     } catch(e) { console.error("Firebase save error:", e); }
   };
 
@@ -39,6 +50,24 @@
       if (snap.exists()) return JSON.parse(snap.data().payload);
     } catch(e) { console.error("Firebase load error:", e); }
     return {};
+  };
+
+  // Upload file to Firebase Storage, return download URL
+  window._firebaseUploadFile = async function(file, path) {
+    try {
+      const storageRef = ref(storage, path);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      return url;
+    } catch(e) { console.error("Firebase upload error:", e); return null; }
+  };
+
+  // Delete file from Firebase Storage
+  window._firebaseDeleteFile = async function(path) {
+    try {
+      const storageRef = ref(storage, path);
+      await deleteObject(storageRef);
+    } catch(e) { console.error("Firebase delete error:", e); }
   };
 
   // Real-time listener: update UI when another user saves
@@ -846,22 +875,41 @@ function describeArc(cx, cy, r, startDeg, endDeg) {
   return `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
 }
 
-// File attachment (stores base64 in Firebase per month)
-function handleFileUpload(event) {
+// File attachment — uploads to Firebase Storage, saves URL in Firestore
+async function handleFileUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
-  if (file.size > 10 * 1024 * 1024) { alert('El archivo supera los 10MB. Usá archivos más pequeños.'); return; }
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const key = monthKey(currentMonth);
-    if (!allData[key]) allData[key] = {};
-    if (!allData[key]._files) allData[key]._files = [];
-    allData[key]._files.push({ name: file.name, type: file.type, data: e.target.result });
-    saveData();
-    renderFileList();
-  };
-  reader.readAsDataURL(file);
+  if (file.size > 10 * 1024 * 1024) { alert('El archivo supera los 10MB.'); return; }
   event.target.value = '';
+
+  // Show uploading indicator
+  showSyncStatus('cargando');
+  const key = monthKey(currentMonth);
+  if (!allData[key]) allData[key] = {};
+  if (!allData[key]._files) allData[key]._files = [];
+
+  // Upload to Firebase Storage
+  const storagePath = `archivos/mes_${currentMonth}/${Date.now()}_${file.name}`;
+  let url = null;
+  if (window._firebaseUploadFile) {
+    url = await window._firebaseUploadFile(file, storagePath);
+  }
+
+  if (!url) {
+    // Fallback: store as base64 if Storage fails
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      allData[key]._files.push({ name: file.name, type: file.type, url: e.target.result, path: null });
+      saveData();
+      renderFileList();
+    };
+    reader.readAsDataURL(file);
+    return;
+  }
+
+  allData[key]._files.push({ name: file.name, type: file.type, url, path: storagePath });
+  saveData();
+  renderFileList();
 }
 
 function isImage(f) {
@@ -879,15 +927,16 @@ function renderFileList() {
   }
   list.innerHTML = files.map((f, i) => {
     const img = isImage(f);
+    const src = f.url || '';
     return `<div class="file-item">
       <div class="file-item-header">
         <i class="ti ti-${img ? 'photo' : 'file'}" style="font-size:14px;color:var(--text-muted);flex-shrink:0;" aria-hidden="true"></i>
-        <a href="${f.data}" download="${f.name}" title="Descargar ${f.name}">${f.name}</a>
+        <a href="${src}" target="_blank" title="Abrir ${f.name}">${f.name}</a>
         <button onclick="removeFile(${i})" title="Eliminar">✕</button>
       </div>
       ${img
-        ? `<img class="file-preview" src="${f.data}" alt="${f.name}" onclick="openLightbox('${i}')" title="Clic para ampliar">`
-        : `<div class="file-doc"><i class="ti ti-file-description" style="font-size:13px;" aria-hidden="true"></i> Documento adjunto — <a href="${f.data}" download="${f.name}" style="color:var(--blue-text);">Descargar</a></div>`
+        ? `<img class="file-preview" src="${src}" alt="${f.name}" onclick="openLightbox('${i}')" title="Clic para ampliar">`
+        : `<div class="file-doc"><i class="ti ti-file-description" style="font-size:13px;" aria-hidden="true"></i> Documento adjunto — <a href="${src}" target="_blank" style="color:var(--blue-text);">Abrir</a></div>`
       }
     </div>`;
   }).join('');
@@ -896,6 +945,11 @@ function renderFileList() {
 function removeFile(idx) {
   const key = monthKey(currentMonth);
   if (!allData[key] || !allData[key]._files) return;
+  const f = allData[key]._files[idx];
+  // Delete from Firebase Storage if has path
+  if (f && f.path && window._firebaseDeleteFile) {
+    window._firebaseDeleteFile(f.path);
+  }
   allData[key]._files.splice(idx, 1);
   saveData();
   renderFileList();
@@ -906,7 +960,7 @@ function openLightbox(idx) {
   const files = md._files || [];
   const f = files[parseInt(idx)];
   if (!f) return;
-  document.getElementById('lightbox-img').src = f.data;
+  document.getElementById('lightbox-img').src = f.url || '';
   document.getElementById('lightbox').classList.add('open');
 }
 
