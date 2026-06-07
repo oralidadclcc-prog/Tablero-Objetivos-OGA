@@ -47,6 +47,9 @@
     return {};
   };
 
+  // Signal that Firebase is ready
+  if (window._firebaseReady) window._firebaseReady();
+
   // Real-time listener: update UI when another user saves
   onSnapshot(DOC_REF, (snap) => {
     if (snap.exists() && window._onRemoteUpdate) {
@@ -1099,8 +1102,18 @@ window.updateBool = function(id) { if (_isEditor) _origUpdateBool(id); };
 const _origUpdateBoolC3 = updateBoolC3;
 window.updateBoolC3 = function() { if (_isEditor) _origUpdateBoolC3(); };
 
-// Init
+// Init — wait for Firebase module to be ready before loading data
+const _firebaseReadyPromise = new Promise(resolve => {
+  window._firebaseReady = resolve;
+});
+
 (async () => {
+  showSyncStatus('cargando');
+  // Wait up to 8 seconds for Firebase to initialize
+  await Promise.race([
+    _firebaseReadyPromise,
+    new Promise(resolve => setTimeout(resolve, 8000))
+  ]);
   await loadData();
   renderMonth();
   loadLabels();
