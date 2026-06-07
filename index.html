@@ -10,7 +10,7 @@
 <!-- Firebase -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyDj6ozDC6R-MXYQ-lKbom_jvD8izXyatjE",
@@ -24,25 +24,49 @@
 
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
-  const DOC_REF = doc(db, "tablero", "data");
 
-  // Expose save/load to global scope
-  window._firebaseSave = async function(data) {
+  // Each month is a separate Firestore document: tablero2/month_0, month_1, etc.
+  // Globals (labels, annual objectives) in tablero2/globals
+  const COL = "tablero2";
+
+  function monthDocRef(m) { return doc(db, COL, "month_" + m); }
+  const GLOBALS_REF = doc(db, COL, "globals");
+
+  // Save a single month document
+  window._firebaseSaveMonth = async function(monthKey, monthData) {
     try {
-      const payload = JSON.stringify(data);
+      const payload = JSON.stringify(monthData);
       if (payload.length > 950000) {
-        // Too big even after compression — notify JS layer
         if (window._onSaveTooBig) window._onSaveTooBig();
-        return;
+        return false;
       }
-      await setDoc(DOC_REF, { payload });
-    } catch(e) { console.error("Firebase save error:", e); }
+      await setDoc(monthDocRef(monthKey.replace('month_','')), { payload });
+      return true;
+    } catch(e) { console.error("Firebase save month error:", e); return false; }
   };
 
+  // Save globals (annual objectives, labels)
+  window._firebaseSaveGlobals = async function(globals) {
+    try {
+      await setDoc(GLOBALS_REF, { payload: JSON.stringify(globals) });
+    } catch(e) { console.error("Firebase save globals error:", e); }
+  };
+
+  // Load all months + globals
   window._firebaseLoad = async function() {
     try {
-      const snap = await getDoc(DOC_REF);
-      if (snap.exists()) return JSON.parse(snap.data().payload);
+      const result = {};
+      // Load all docs in collection
+      const snap = await getDocs(collection(db, COL));
+      snap.forEach(d => {
+        const data = JSON.parse(d.data().payload || '{}');
+        if (d.id === 'globals') {
+          Object.assign(result, data);
+        } else {
+          result[d.id] = data;
+        }
+      });
+      return result;
     } catch(e) { console.error("Firebase load error:", e); }
     return {};
   };
@@ -50,15 +74,23 @@
   // Signal that Firebase is ready
   if (window._firebaseReady) window._firebaseReady();
 
-  // Real-time listener: update UI when another user saves
-  onSnapshot(DOC_REF, (snap) => {
-    if (snap.exists() && window._onRemoteUpdate) {
-      try {
-        const remote = JSON.parse(snap.data().payload);
-        window._onRemoteUpdate(remote);
-      } catch(e) {}
+  // Real-time listener on globals (annual objectives, labels)
+  onSnapshot(GLOBALS_REF, (snap) => {
+    if (snap.exists() && window._onRemoteGlobals) {
+      try { window._onRemoteGlobals(JSON.parse(snap.data().payload)); } catch(e) {}
     }
   });
+
+  // Real-time listener on current month — updated when month changes
+  let _unsubMonth = null;
+  window._subscribeMonth = function(m) {
+    if (_unsubMonth) _unsubMonth();
+    _unsubMonth = onSnapshot(monthDocRef(m), (snap) => {
+      if (snap.exists() && window._onRemoteMonth) {
+        try { window._onRemoteMonth(m, JSON.parse(snap.data().payload)); } catch(e) {}
+      }
+    });
+  };
 </script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -496,14 +528,25 @@ let currentMonth = new Date().getMonth(); // 0-indexed
 let allData = {};
 let _saveTimer = null;
 
-// Debounced save to Firebase (waits 600ms after last change)
+// Debounced save to Firebase — saves current month + globals separately
 function saveData() {
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(async () => {
-    if (window._firebaseSave) {
-      await window._firebaseSave(allData);
-      showSyncStatus('guardado');
+    const key = 'month_' + currentMonth;
+    const monthData = allData[key] || {};
+    const globals = {};
+    // Extract global keys (annual objectives, labels)
+    for (const k of Object.keys(allData)) {
+      if (!k.startsWith('month_')) globals[k] = allData[k];
     }
+    let ok = true;
+    if (window._firebaseSaveMonth) {
+      ok = await window._firebaseSaveMonth(key, monthData);
+    }
+    if (ok && window._firebaseSaveGlobals) {
+      await window._firebaseSaveGlobals(globals);
+    }
+    if (ok) showSyncStatus('guardado');
   }, 600);
 }
 
@@ -516,24 +559,26 @@ async function loadData() {
   showSyncStatus('listo');
 }
 
-// Real-time remote update handler
-window._onRemoteUpdate = function(remote) {
-  // Merge remote data but preserve _files from local allData
-  const merged = JSON.parse(JSON.stringify(remote));
-  for (const key of Object.keys(allData)) {
-    if (allData[key] && allData[key]._files && allData[key]._files.length) {
-      if (!merged[key]) merged[key] = {};
-      const remoteLen = (merged[key]._files || []).length;
-      const localLen = allData[key]._files.length;
-      if (localLen >= remoteLen) {
-        merged[key]._files = allData[key]._files;
-      }
-    }
+// Real-time remote update handlers
+window._onRemoteGlobals = function(globals) {
+  for (const k of Object.keys(globals)) {
+    if (!k.startsWith('month_')) allData[k] = globals[k];
   }
-  if (JSON.stringify(merged) !== JSON.stringify(allData)) {
-    allData = merged;
+  loadLabels();
+  updateSummary();
+  showSyncStatus('actualizado');
+};
+
+window._onRemoteMonth = function(m, monthData) {
+  const key = 'month_' + m;
+  // Preserve local _files if remote doesn't have them yet
+  const localFiles = (allData[key] && allData[key]._files) ? allData[key]._files : [];
+  allData[key] = monthData;
+  if (!allData[key]._files || allData[key]._files.length < localFiles.length) {
+    allData[key]._files = localFiles;
+  }
+  if (m === currentMonth) {
     renderMonth();
-    loadLabels();
     showSyncStatus('actualizado');
   }
 };
@@ -684,6 +729,7 @@ function renderMonth() {
 function changeMonth(dir) {
   currentMonth = Math.max(0, Math.min(11, currentMonth + dir));
   renderMonth();
+  if (window._subscribeMonth) window._subscribeMonth(currentMonth);
 }
 
 // Update functions
@@ -1109,7 +1155,6 @@ const _firebaseReadyPromise = new Promise(resolve => {
 
 (async () => {
   showSyncStatus('cargando');
-  // Wait up to 8 seconds for Firebase to initialize
   await Promise.race([
     _firebaseReadyPromise,
     new Promise(resolve => setTimeout(resolve, 8000))
@@ -1117,6 +1162,8 @@ const _firebaseReadyPromise = new Promise(resolve => {
   await loadData();
   renderMonth();
   loadLabels();
+  // Subscribe to real-time updates for current month
+  if (window._subscribeMonth) window._subscribeMonth(currentMonth);
 })();
 
 // Editable title & subtitle — save on blur
