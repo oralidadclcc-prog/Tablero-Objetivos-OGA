@@ -29,7 +29,13 @@
   // Expose save/load to global scope
   window._firebaseSave = async function(data) {
     try {
-      await setDoc(DOC_REF, { payload: JSON.stringify(data) });
+      const payload = JSON.stringify(data);
+      if (payload.length > 950000) {
+        // Too big even after compression — notify JS layer
+        if (window._onSaveTooBig) window._onSaveTooBig();
+        return;
+      }
+      await setDoc(DOC_REF, { payload });
     } catch(e) { console.error("Firebase save error:", e); }
   };
 
@@ -509,9 +515,20 @@ async function loadData() {
 
 // Real-time remote update handler
 window._onRemoteUpdate = function(remote) {
-  // Only update if data actually changed
-  if (JSON.stringify(remote) !== JSON.stringify(allData)) {
-    allData = remote;
+  // Merge remote data but preserve _files from local allData
+  const merged = JSON.parse(JSON.stringify(remote));
+  for (const key of Object.keys(allData)) {
+    if (allData[key] && allData[key]._files && allData[key]._files.length) {
+      if (!merged[key]) merged[key] = {};
+      const remoteLen = (merged[key]._files || []).length;
+      const localLen = allData[key]._files.length;
+      if (localLen >= remoteLen) {
+        merged[key]._files = allData[key]._files;
+      }
+    }
+  }
+  if (JSON.stringify(merged) !== JSON.stringify(allData)) {
+    allData = merged;
     renderMonth();
     loadLabels();
     showSyncStatus('actualizado');
@@ -850,7 +867,7 @@ function describeArc(cx, cy, r, startDeg, endDeg) {
 const MAX_FILE_KB = 700; // max KB per file after compression
 const MAX_DIMENSION = 1800; // max width or height in pixels
 
-// Compress image using canvas
+// Compress image using canvas — progressive until it fits
 function compressImage(file) {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -859,22 +876,39 @@ function compressImage(file) {
       img.onload = function() {
         const canvas = document.createElement('canvas');
         let w = img.width, h = img.height;
-        // Scale down if too large
-        if (w > MAX_DIMENSION || h > MAX_DIMENSION) {
-          const ratio = Math.min(MAX_DIMENSION / w, MAX_DIMENSION / h);
-          w = Math.round(w * ratio);
-          h = Math.round(h * ratio);
+        let dimension = MAX_DIMENSION;
+
+        function tryCompress(quality, dim) {
+          let tw = w, th = h;
+          if (tw > dim || th > dim) {
+            const ratio = Math.min(dim / tw, dim / th);
+            tw = Math.round(tw * ratio);
+            th = Math.round(th * ratio);
+          }
+          canvas.width = tw;
+          canvas.height = th;
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, tw, th);
+          ctx.drawImage(img, 0, 0, tw, th);
+          return canvas.toDataURL('image/jpeg', quality);
         }
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, w, h);
-        // Try progressive quality until under MAX_FILE_KB
+
+        // Try progressively lower quality and dimension until under MAX_FILE_KB
         let quality = 0.85;
-        let dataUrl = canvas.toDataURL('image/jpeg', quality);
-        while (dataUrl.length > MAX_FILE_KB * 1024 * 1.37 && quality > 0.2) {
-          quality -= 0.1;
-          dataUrl = canvas.toDataURL('image/jpeg', quality);
+        let dim = MAX_DIMENSION;
+        let dataUrl = tryCompress(quality, dim);
+
+        while (dataUrl.length > MAX_FILE_KB * 1024 * 1.37) {
+          if (quality > 0.25) {
+            quality = Math.round((quality - 0.1) * 10) / 10;
+          } else if (dim > 600) {
+            dim -= 200;
+            quality = 0.7;
+          } else {
+            // Can't compress further
+            break;
+          }
+          dataUrl = tryCompress(quality, dim);
         }
         resolve({ dataUrl, compressed: true });
       };
@@ -883,6 +917,17 @@ function compressImage(file) {
     reader.readAsDataURL(file);
   });
 }
+
+// Notify user if image is too big even after compression
+window._onSaveTooBig = function() {
+  alert('La infografía fue comprimida pero aún es demasiado grande para guardar en la nube. Intentá exportarla en menor resolución desde NotebookLM (por ejemplo como JPG en lugar de PNG).');
+  // Remove the file that caused the issue from allData
+  const key = monthKey(currentMonth);
+  if (allData[key] && allData[key]._files && allData[key]._files.length) {
+    allData[key]._files.pop();
+    renderFileList();
+  }
+};
 
 function handleFileUpload(event) {
   const file = event.target.files[0];
@@ -898,14 +943,12 @@ function handleFileUpload(event) {
   const isImg = file.type.startsWith('image/');
 
   if (isImg) {
-    // Compress image then save
     compressImage(file).then(({ dataUrl }) => {
       allData[key]._files.push({ name: file.name, type: 'image/jpeg', url: dataUrl });
       saveData();
       renderFileList();
     });
   } else {
-    // Non-image: read as base64 directly (PDFs etc, warn if large)
     if (file.size > MAX_FILE_KB * 1024) {
       alert('Los archivos que no son imágenes se guardan tal cual. Si supera 700KB puede no guardarse correctamente en la nube.');
     }
