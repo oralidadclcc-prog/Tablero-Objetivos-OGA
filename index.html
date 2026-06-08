@@ -916,7 +916,7 @@ function describeArc(cx, cy, r, startDeg, endDeg) {
 const MAX_FILE_KB = 500; // max KB per file after compression
 const MAX_DIMENSION = 1200; // max width or height in pixels
 
-// Compress image using canvas — progressive until it fits
+// Compress image using canvas — aggressive multi-pass until fits in Firestore
 function compressImage(file) {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -924,42 +924,40 @@ function compressImage(file) {
       const img = new Image();
       img.onload = function() {
         const canvas = document.createElement('canvas');
-        let w = img.width, h = img.height;
-        let dimension = MAX_DIMENSION;
 
-        function tryCompress(quality, dim) {
-          let tw = w, th = h;
-          if (tw > dim || th > dim) {
-            const ratio = Math.min(dim / tw, dim / th);
-            tw = Math.round(tw * ratio);
-            th = Math.round(th * ratio);
-          }
+        function tryCompress(dim, quality) {
+          let tw = img.width, th = img.height;
+          const ratio = Math.min(dim / tw, dim / th, 1);
+          tw = Math.round(tw * ratio);
+          th = Math.round(th * ratio);
           canvas.width = tw;
           canvas.height = th;
           const ctx = canvas.getContext('2d');
-          ctx.clearRect(0, 0, tw, th);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, tw, th);
           ctx.drawImage(img, 0, 0, tw, th);
           return canvas.toDataURL('image/jpeg', quality);
         }
 
-        // Try progressively lower quality and dimension until under MAX_FILE_KB
-        let quality = 0.85;
-        let dim = MAX_DIMENSION;
-        let dataUrl = tryCompress(quality, dim);
+        // Target: under 700KB base64 (~500KB file)
+        // base64 is ~1.37x larger than binary
+        const TARGET = 700 * 1024 * 1.37;
 
-        while (dataUrl.length > MAX_FILE_KB * 1024 * 1.37) {
-          if (quality > 0.15) {
-            quality = Math.round((quality - 0.1) * 10) / 10;
-          } else if (dim > 400) {
-            dim -= 150;
-            quality = 0.6;
-          } else {
-            // Can't compress further
-            break;
-          }
-          dataUrl = tryCompress(quality, dim);
+        // Try combinations from high to low quality
+        const attempts = [
+          [1200, 0.85], [1200, 0.7], [1200, 0.55],
+          [900, 0.75],  [900, 0.6],  [900, 0.45],
+          [700, 0.7],   [700, 0.55], [700, 0.4],
+          [500, 0.65],  [500, 0.5],  [500, 0.35],
+          [400, 0.6],   [400, 0.45], [400, 0.3],
+        ];
+
+        let dataUrl = tryCompress(1200, 0.85);
+        for (const [dim, q] of attempts) {
+          if (dataUrl.length <= TARGET) break;
+          dataUrl = tryCompress(dim, q);
         }
-        resolve({ dataUrl, compressed: true });
+        resolve({ dataUrl });
       };
       img.src = e.target.result;
     };
